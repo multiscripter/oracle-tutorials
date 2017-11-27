@@ -1,5 +1,5 @@
 /**
-* Package for Oracle tutorial "JDBC Basics". Chapter "Getting Started".
+* Package for Oracle tutorial "JDBC Basics". Chapter 1. "Getting Started".
 *
 * @see https://docs.oracle.com/javase/tutorial/jdbc/basics/gettingstarted.html
 * @author Gureyev Ilya (mailto:ill-jah@yandex.ru)
