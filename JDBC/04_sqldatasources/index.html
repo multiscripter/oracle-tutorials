@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Подключение с объектом DataSource</title>
+</head>
+<body>
+    <h1>Подключение с объектом DataSource</h1>
+    <p>
+        В этом разделе рассматриваются объекты <code>DataSource</code>,
+        которые являются предпочтительным средством получения соединения с источником данных.
+        В дополнение к другим преимуществам, которые будут объяснены позже,
+        объекты <code>DataSource</code> могут обеспечивать объединение пулов и распределенные транзакции.
+        Эта функциональность необходима для работы с корпоративными базами данных.
+        В частности, это является неотъемлемой частью технологии Enterprise JavaBeans (EJB).
+    </p>
+    <p>
+        В этом разделе показано, как получить соединение с помощью интерфейса <code>DataSource</code>
+        и как использовать распределенные транзакции и объединение пулов. Оба они включают
+        очень мало изменений кода в вашем приложении JDBC.
+    </p>
+    <p>
+        Работа, выполняемая для развертывания классов, делающих эти операции возможными,
+        которую обычно делает системный администратор с помощью инструмента
+        (например, Apache Tomcat или Oracle WebLogic Server), зависит от типа объекта <code>DataSource</code>,
+        который развертывается. В результате большая часть этого раздела посвящена тому, как системный
+        администратор устанавливает среду, чтобы программисты могли использовать объект <code>DataSource</code>
+        для получения соединений.
+    </p>
+    <p>Рассмотрены следующие темы:</p>
+    <ul>
+        <li><a href="#datasource_connection">Использование объектов DataSource для подключения</a></li>
+        <li><a href="#deploy_datasource">Развертывание основных объектов DataSource</a></li>
+        <li><a href="#datasource_implementation">Развертывание других реализаций DataSource</a></li>
+        <li><a href="#pooled_connection">Получение и использование объединенных подключений (pool)</a></li>
+        <li><a href="#deployment_distributed_transactions">Развертывание распределенных транзакций</a></li>
+        <li><a href="#using_connections_distributed_transactions">Использование подключений для распределенных транзакций</a></li>
+    </ul>
+    <h2 id="datasource_connection">Использование объектов DataSource для получения соединения</h2>
+    <p>
+        В разделе <a href="connecting.html">Установке соединения</a> вы узнали, как получить соединение,
+        используя класс <code>DriverManager</code>. В этом разделе показано, как использовать объект
+        <code>DataSource</code> для подключения к источнику данных, что является предпочтительным способом.
+    </p>
+    <p>
+        Объекты, созданные экземплярами классов, реализующих <code>DataSource</code>, представляют собой
+        определенную СУБД или какой-либо другой источник данных, такой как файл. Если компания использует более
+        одного источника данных, она будет развертывать отдельный объект DataSource для каждого из них.
+        Интерфейс <code>DataSource</code> реализуется поставщиком драйверов. Его можно реализовать тремя способами:
+    </p>
+    <ul>
+        <li>
+            Основная реализация <code>DataSource</code> создает стандартные объекты Connection,
+            которые не объединены или не используются в распределенной транзакции.
+        </li>
+        <li>
+            Реализация <code>DataSource</code>, поддерживающая объединение пулов, создает объекты
+            <code>Connection</code>, которые участвуют в пуле соединений, то есть соединения,
+            которые могут быть переработаны.
+        </li>
+        <li>
+            Реализация <code>DataSource</code>, поддерживающая распределенные транзакции, создает объекты
+            <code>Connection</code>, которые могут использоваться в распределенной транзакции,
+            то есть транзакция, которая обращается к двум или более серверам СУБД.
+        </li>
+    </ul>
+    <p>
+        Драйвер JDBC должен включать по крайней мере базовую реализацию <code>DataSource</code>.
+        Например, драйвер Java JDBC включает реализацию <code>org.apache.derby.jdbc.ClientDataSource</code>,
+        а для MySQL <code>com.mysql.jdbc.jdbc2.optional.MysqlDataSource</code>.
+        Если ваш клиент работает на Java 8 compact profile 2,
+        то Java DB JDBC-драйвер - это <code>org.apache.derby.jdbc.BasicClientDataSource40</code>.
+        Для этого примера требуется compact profile 3 или выше.
+    </p>
+    <p>
+        Класс <code>DataSource</code>, который поддерживает распределенные транзакции, обычно также поддерживает
+        поддержку пула соединений. Например, класс <code>DataSource</code>, предоставляемый поставщиком EJB,
+        почти всегда поддерживает как пул соединений, так и распределенные транзакции.
+    </p>
+    <p>
+        Предположим, что владелец процветающей сети магазинов The Coffee Break, по сравнению с предыдущими
+        примерами, решил еще больше расширить продажи кофе через Интернет. Учитывая, что ожидается большой
+        объем онлайн-бизнеса, владельцу обязательно понадобится объединение пулов. Открытие и закрытие
+        соединений связано с большими накладными расходами, и владелец ожидает, что эта система онлайн-заказов
+        потребует значительного количества запросов и обновлений. Пул соединений можно использовать снова и снова,
+        избегая затрат на создание нового соединения для каждого доступа к базе данных.
+        Кроме того, у владельца теперь есть вторая СУБД, которая содержит данные для недавно приобретенной
+        компании по обжариванию кофе. Это означает, что владелец захочет писать распределенные транзакции,
+        которые используют как старый сервер СУБД, так и новый.
+    </p>
+    <p>
+        Владелец цепочки переконфигурировал компьютерную систему, чтобы обслуживать новую, большую клиентскую базу.
+        Владелец купил самый последний драйвер JDBC и сервер приложений EJB, который работает с ним,
+        чтобы иметь возможность использовать распределенные транзакции и получать повышенную производительность,
+        связанную с пулом соединений. Доступны многие драйверы JDBC, совместимые с недавно приобретенным
+        EJB-сервером. Теперь у владельца есть трехуровневая архитектура (three-tier architecture)
+        с новым сервером приложений EJB и драйвером JDBC на среднем уровне (second tier) и двумя серверами СУБД
+        в качестве третьего уровня (third tier). Клиентские компьютеры, делающие запросы,
+        являются первым уровнем (first tier).
+    </p>
+    <h2 id="deploy_datasource">Развертывание основных объектов DataSource</h2>
+    <p>
+        Системному администратору необходимо развернуть объекты <code>DataSource</code>,
+        чтобы команда программирования Coffee Break начала использовать их.
+        Развертывание объекта <code>DataSource</code> состоит из трех задач:
+    </p>
+    <ol>
+        <li>Создание экземпляра класса <code>DataSource</code></li>
+        <li>Настройка его свойств</li>
+        <li>Регистрация его с помощью службы именования, которая использует API именования и интерфейса Java (JNDI)</li>
+    </ol>
+    <p>
+        Во-первых, рассмотрим самый простой случай, который заключается в использовании базовой реализации
+        интерфейса <code>DataSource</code>, то есть той, которая не поддерживает объединение пулов
+        или распределенных транзакций. В этом случае требуется только один объект <code>DataSource</code>,
+        который необходимо развернуть. Базовая реализация <code>DataSource</code> создает те же типы соединений,
+        что и класс <code>DriverManager</code>.
+    </p>
+    <h3>Создание экземпляра класса DataSource и настройка его свойств</h3>
+    <p>
+        Предположим, что компания, которая хочет только базовую реализацию <code>DataSource</code>,
+        купила драйвер у поставщика JDBC DB Access, Inc. Этот драйвер включает в себя класс
+        <code>com.dbaccess.BasicDataSource</code>, который реализует интерфейс <code>DataSource</code>.
+        Следующий фрагмент кода создает экземпляр класса <code>BasicDataSource</code> и устанавливает его свойства.
+        После развертывания экземпляра <code>BasicDataSource</code> программист может вызвать метод
+        <code>DataSource.getConnection()</code>, чтобы получить соединение с базой данных компании
+        <code>CUSTOMER_ACCOUNTS</code>. Во-первых, системный администратор создает объект
+        <code><em>ds</em></code> базы данных <code>DataSource</code> с помощью конструктора по умолчанию.
+        Затем системный администратор устанавливает три свойства. Обратите внимание, что следующий код обычно
+        выполняется с помощью инструмента развертывания:
+    </p>
+    <pre>
+com.dbaccess.BasicDataSource ds = new com.dbaccess.BasicDataSource();
+ds.setServerName("grinder");
+ds.setDatabaseName("CUSTOMER_ACCOUNTS");
+ds.setDescription("Customer accounts database for billing");
+    </pre>
+    <p>
+        Теперь переменная <code><em>ds</em></code> представляет собой базу данных <code>CUSTOMER_ACCOUNTS</code>,
+        установленную на сервере. Любое соединение, созданное объектом базы данных <code>BasicDataSource</code>,
+        будет соединением с базой данных <code>CUSTOMER_ACCOUNTS</code>.
+    </p>
+    <h3>Регистрация объекта DataSource с помощью службы именования, использующей API JNDI</h3>
+    <p>
+        С установленными свойствами системный администратор может зарегистрировать объект 4
+        <code>BasicDataSource</code> с помощью службы именования JNDI (Java Naming and Directory Interface).
+        Используемая конкретная служба именования обычно определяется системным свойством, которое здесь
+        не показано. Следующий фрагмент кода регистрирует объект <code>BasicDataSource</code>
+        и связывает его с логическим именем <code>jdbc/billingDB</code>:
+    </p>
+    <p>
+        Этот код использует JNDI API. Первая строка создает объект <code>InitialContext</code>,
+        который служит отправной точкой для имени, аналогичного корневому каталогу в файловой системе.
+        Вторая строка ассоциирует или связывает <code>BasicDataSource</code> объект <code><em>ds</em></code>
+        с логическим именем <code>jdbc/billingDB</code>. В следующем отрывке кода вы даете службе именования
+        это логическое имя и возвращает объект <code>BasicDataSource</code>. Логическим именем может быть
+        любая строка. В этом случае компания решила использовать имя <code>billingDB</code> как логическое
+        имя для базы данных <code>CUSTOMER_ACCOUNTS</code>.
+    </p>
+    <p>
+        В предыдущем примере <code>jdbc</code> является подконтекстом в начальном контексте, так же,
+        как каталог под корневым каталогом является подкаталогом. Имя <code>jdbc/billingDB</code>
+        похоже на имя пути, где последний элемент в пути аналогичен имени файла.
+        В этом случае <code>billingDB</code> является логическим именем, которое присваивается
+        <code>BasicDataSource</code> объекту <code><em>ds</em></code>. Подконтекст <code>jdbc</code>
+        зарезервирован для привязки логических имен к объектам <code>DataSource</code>, поэтому
+        <code>jdbc</code> всегда будет первой частью логического имени для источника данных.
+    </p>
+    <h3>Использование развернутого (deployed) объекта DataSource</h3>
+    <p>
+        После того как базовая реализация <code>DataSource</code> будет развернута системным администратором,
+        она готова для использования программистом. Это означает, что программист может предоставить
+        имя источника логических данных, привязанное к экземпляру класса <code>DataSource</code>,
+        а служба именования JNDI вернет экземпляр этого класса <code>DataSource</code>. Затем метод
+        <code>getConnection()</code> можно вызвать у этого объекта <code>DataSource</code>,
+        чтобы получить соединение с источником данных, который он представляет. Например, программист может
+        написать следующие две строки кода, чтобы получить объект <code>DataSource</code>, который создает
+        соединение с базой данных <code>CUSTOMER_ACCOUNTS</code>.
+    </p>
+    <pre>
+Context ctx = new InitialContext();
+DataSource ds = (DataSource)ctx.lookup("jdbc/billingDB");
+    </pre>
+    <p>
+        Первая строка кода получает исходный контекст в качестве отправной точки для извлечения объекта
+        <code>DataSource</code>. Когда вы отправляете логическое имя <code>jdbc/billingDB</code> в метод
+        <code>lookup()</code>. Метод возвращает объект <code>DataSource</code>, связанный системным
+        администратором с <code>jdbc/billingDB</code> во время развертывания. Поскольку возвращаемое значение
+        метода <code>lookup()</code> является объекти типа <code>Object</code> мы должны передать его более
+        конкретному типу <code>DataSource</code>, прежде чем назначать его переменной <code><em>ds</em></code>.
+    </p>
+    <p>
+        Переменная <code><em>ds</em></code> является экземпляром класса <code>com.dbaccess.BasicDataSource</code>,
+        который реализует интерфейс <code>DataSource</code>. Вызов метода <code>ds.getConnection</code> создает
+        соединение с базой данных <code>CUSTOMER_ACCOUNTS</code>.
+    </p>
+    <pre>
+Connection con = ds.getConnection("fernanda","brewed");
+    </pre>
+    <p>
+        Метод <code>getConnection()</code> требует только имя пользователя и пароль, потому что переменная
+        <code><em>ds</em></code> содержит остальную информацию, необходимую для установления соединения
+        с базой данных <code>CUSTOMER_ACCOUNTS</code>, такой как имя и местоположение базы данных, в ее свойствах.
+    </p>
+    <h3>Преимущества объектов DataSource</h3>
+    <p>
+        Из-за его свойств объект <code>DataSource</code> является лучшей альтернативой, чем класс
+        <code>DriverManager</code> для получения соединения. Программистам больше не нужно жестко кодировать
+        имя драйвера или URL-адрес JDBC в своих приложениях, что делает их более переносимыми.
+        Кроме того, свойства <code>DataSource</code> делают код обслуживания намного проще.
+        Если произошли изменения, системный администратор может обновлять свойства источника данных
+        и не беспокоиться об изменении каждого приложения, которое делает подключение к источнику данных.
+        Например, если источник данных был перемещен на другой сервер, все системные администраторы должны
+        были бы установить свойство <code>serverName</code> для нового имени сервера.
+    </p>
+    <p>
+        Помимо переносимости и простоты обслуживания, использование объекта <code>DataSource</code>
+        для получения соединений может предложить другие преимущества. Когда интерфейс <code>DataSource</code>
+        реализован для работы с реализацией <code>ConnectionPoolDataSource</code>, все соединения,
+        создаваемые экземплярами этого класса <code>DataSource</code>, будут автоматически объединены в соединения.
+        Аналогично, когда реализация <code>DataSource</code> реализована для работы с классом
+        <code>XADataSource</code>, все соединения, которые он создает, автоматически будут соединениями,
+        которые могут использоваться в распределенной транзакции. В следующем разделе показано,
+        как развернуть эти типы реализаций <code>DataSource</code>.
+    </p>
+    <h2 id="datasource_implementation">Развертывание других реализаций DataSource</h2>
+    <p>
+        Системный администратор или другое лицо, работающее в таком качестве, может развернуть объект
+        <code>DataSource</code>, чтобы соединения, которые он создает, объединяли соединения.
+        Для этого он сначала развертывает объект <code>ConnectionPoolDataSource</code>,
+        а затем развертывает объект <code>DataSource</code>, реализованный для работы с ним.
+        Свойства объекта <code>ConnectionPoolDataSource</code> устанавливаются так,
+        чтобы он представлял источник данных, к которому будут производиться соединения.
+        После того, как объект <code>ConnectionPoolDataSource</code> зарегистрирован в службе именования JNDI,
+        объект <code>DataSource</code> развернут. Обычно для объекта <code>DataSource</code>
+        должны быть установлены только два свойства: <code>description</code> и <code>dataSourceName</code>.
+        Значение, указанное для свойства <code>dataSourceName</code>, является логическим именем,
+        идентифицирующим ранее запущенный объект <code>ConnectionPoolDataSource</code>, который является объектом,
+        содержащим свойства, необходимые для соединения.
+    </p>
+    <p>
+        При развертывании объектов <code>ConnectionPoolDataSource</code> и <code>DataSource</code>
+        вы можете вызвать метод <code>DataSource.getConnection()</code> у объекта <code>DataSource</code>
+        и получить объединенное соединение. Это соединение будет связано с источником данных,
+        указанным в свойствах объекта <code>ConnectionPoolDataSource</code>.
+    </p>
+    <p>
+        В следующем примере описывается, как системный администратор The Coffee Break будет развертывать
+        объект <code>DataSource</code>, реализованный для обеспечения объединенных соединений.
+        Системный администратор обычно использует инструмент развертывания, поэтому фрагменты кода,
+        показанные в этом разделе, представляют собой код, который будет выполнять инструмент развертывания.
+    </p>
+    <p>
+        Чтобы получить лучшую производительность, компания Coffee Break купила драйвер JDBC от DB Access, Inc.,
+        который включает класс <code>com.dbaccess.ConnectionPoolDS</code>, который реализует интерфейс
+        <code>ConnectionPoolDataSource</code>. Системный администратор создает экземпляр этого класса,
+        устанавливает его свойства и регистрирует его с помощью службы именования JNDI.
+        Coffee Break купила свой <code>DataSource</code>-класс <code>com.applogic.PooledDataSource</code>,
+        от своего поставщика EJB-сервера, Application Logic, Inc. Класс <code>com.applogic.PooledDataSource</code>
+        реализует пул соединений <code>ConnectionPoolDataSource</code>, используя базовую поддержку,
+        предоставляемую классом <code>com.dbaccess.ConnectionPoolDS</code>.
+    </p>
+    <p>
+        Сначала необходимо установить объект <code>ConnectionPoolDataSource</code>. Следующий код создает
+        экземпляр <code>com.dbaccess.ConnectionPoolDS</code> и устанавливает его свойства:
+    </p>
+    <pre>
+com.dbaccess.ConnectionPoolDS cpds = new com.dbaccess.ConnectionPoolDS();
+cpds.setServerName("creamer");
+cpds.setDatabaseName("COFFEEBREAK");
+cpds.setPortNumber(9040);
+cpds.setDescription("Connection pooling for " + "COFFEEBREAK DBMS");
+    </pre>
+    <p>
+        После развертывания объекта <code>ConnectionPoolDataSource</code> системный администратор развертывает
+        объект <code>DataSource</code>. Следующий код регистрирует объект <code>cpds</code> класса
+        <code>com.dbaccess.ConnectionPoolDS</code> с помощью службы именования JNDI. Обратите внимание,
+        что логическое имя, связанное с переменной <code>cpds</code>, имеет пул субконтексов,
+        добавленный под подконтекстом <code>jdbc</code>, который похож на добавление подкаталога в другой
+        подкаталог в иерархической файловой системе. Логическое имя любого экземпляра класса
+        <code>com.dbaccess.ConnectionPoolDS</code> всегда будет начинаться с <code>jdbc/pool</code>.
+        Oracle рекомендует помещать все объекты <code>ConnectionPoolDataSource</code> в подконтекст
+        <code>jdbc/pool</code>:
+    </p>
+    <pre>
+Context ctx = new InitialContext();
+ctx.bind("jdbc/pool/fastCoffeeDB", cpds);
+    </pre>
+    <p>
+        Затем развертывается класс <code>DataSource</code>, который реализуется для взаимодействия с переменной
+        <code>cpds</code> и другими экземплярами класса <code>com.dbaccess.ConnectionPoolDS</code>.
+        Следующий код создает экземпляр этого класса и устанавливает его свойства.
+        Обратите внимание, что для этого экземпляра <code>com.applogic.PooledDataSource</code> задано только
+        два свойства. Свойство <code>description</code> установлено, потому что оно всегда требуется.
+        Другое свойство, которое установлено, <code>dataSourceName</code>, дает логическое имя JNDI
+        для <code>cpds</code>, которое является экземпляром класса <code>com.dbaccess.ConnectionPoolDS</code>.
+        Другими словами, <code>cpds</code> представляет объект <code>ConnectionPoolDataSource</code>,
+        который будет реализовывать пул соединений для объекта <code>DataSource</code>.
+    </p>
+    <p>
+        Следующий код, который, вероятно, будет выполняться инструментом развертывания,
+        создает объект <code>PooledDataSource</code>, устанавливает его свойства и связывает его с логическим
+        именем <code>jdbc/fastCoffeeDB</code>:
+    </p>
+    <pre>
+com.applogic.PooledDataSource ds = new com.applogic.PooledDataSource();
+ds.setDescription("produces pooled connections to COFFEEBREAK");
+ds.setDataSourceName("jdbc/pool/fastCoffeeDB");
+Context ctx = new InitialContext();
+ctx.bind("jdbc/fastCoffeeDB", ds);
+    </pre>
+    <p>
+        В этом фрагменте кода развертывается объект <code>DataSource</code>, из которого приложение может
+        получать объединенные соединения с базой данных <code>COFFEEBREAK</code>.
+    </p>
+    <h2 id="pooled_connection">Получение и использование объединенных подключений (pool)</h2>
+    <p>
+        <em>Пул соединений</em> - это кеш объектов подключения к базе данных. Объекты представляют физические
+        подключения к базе данных, которые могут использоваться приложением для подключения к базе данных.
+        Во время выполнения приложение запрашивает соединение из пула. Если пул содержит соединение,
+        которое может удовлетворить запрос, оно возвращает соединение. Если соединения не найдены,
+        создается новое соединение и возвращается в приложение. Приложение использует соединение для выполнения
+        некоторой работы с базой данных, а затем возвращает соединение обратно в пул. Затем объект соединения
+        доступен для следующего запроса на соединение с БД.
+    </p>
+    <p>
+        Пулы соединений способствуют повторному использованию объектов подключения и уменьшают количество
+        создаваемых объектов соединения. Пулы соединений значительно повышают производительность приложений
+        с интенсивным использованием баз данных, поскольку создание объектов соединения является дорогостоящим
+        как с точки зрения времени, так и с точки зрения ресурсов.
+    </p>
+    <p>
+        Теперь, когда эти объекты <code>DataSource</code> и <code>ConnectionPoolDataSource</code> развернуты,
+        программист может использовать объект <code>DataSource</code> для получения объединенного соединения.
+        Код для получения объединенного соединения аналогичен коду для получения непустого соединения,
+        как показано в следующих двух строках:
+    </p>
+    <pre>
+ctx = new InitialContext();
+ds = (DataSource)ctx.lookup("jdbc/fastCoffeeDB");
+    </pre>
+    <p>
+        Переменная <code><em>ds</em></code> представляет объект <code>DataSource</code>, который создает
+        объединенные соединения с базой данных <code>COFFEEBREAK</code>. Вам нужно получить этот объект
+        <code>DataSource</code> только один раз, потому что вы можете использовать его для создания как можно
+        большего количества объединенных соединений. Вызов метода <code>getConnection()</code> на переменной
+        <code><em>ds</em></code> автоматически создает объединенное соединение, потому что объект
+        <code>DataSource</code>, который представляет переменная <code><em>ds</em></code>,
+        настроен для создания объединенных соединений.
+    </p>
+    <p>
+        Пул соединений обычно прозрачен для программиста. Вам нужно всего две вещи,
+        когда вы используете объединенные соединения:
+    </p>
+    <ol>
+        <li>
+            <p>
+                Для получения соединения используйте объект <code>DataSource</code>,
+                а не класс <code>DriverManager</code>. В следующей строке кода <code><em>ds</em></code>
+                - это объект <code>DataSource</code>, реализованный и развернутый, так что он будет создавать
+                пустые соединения, а имя пользователя и пароль - это переменные, которые представляют учетные
+                данные пользователя, имеющего доступ к базе данных:
+            </p>
+            <pre>
+Connection con = ds.getConnection(username, password);
+            </pre>
+        </li>
+        <li>
+            <p>
+                Используйте оператор <code>finally</code> для закрытия объединенного соединения.
+                Следующий блок <code>finally</code> появится после блока <code>try/catch</code>,
+                который применяется к коду, в котором использовалось объединенное соединение:
+            </p>
+            <pre>
+try {
+    Connection con = ds.getConnection(username, password);
+    // ... code to use the pooled
+    // connection con
+} catch (Exception ex {
+    // ... code to handle exceptions
+} finally {
+    if (con != null) con.close();
+}
+            </pre>
+        </li>
+    </ol>
+    <p>
+        В противном случае приложение, использующее объединенное соединение, идентично приложению,
+        использующему обычное соединение. Единственное, что может заметить прикладной программист,
+        когда происходит объединение пулов, - это то, что производительность лучше.
+    </p>
+    <p>
+        Следующий пример кода получает объект <code>DataSource</code>, который создает соединения с базой данных
+        <code>COFFEEBREAK</code> и использует его для обновления цены в таблице <code>COFFEES</code>:
+    </p>
+    <pre>
+import java.sql.*;
+import javax.sql.*;
+import javax.ejb.*;
+import javax.naming.*;
+public class ConnectionPoolingBean implements SessionBean {
+    // ...
+    public void ejbCreate() throws CreateException {
+        ctx = new InitialContext();
+        ds = (DataSource)ctx.lookup("jdbc/fastCoffeeDB");
+    }
+    public void updatePrice(float price, String cofName,
+                            String username, String password)
+        throws SQLException{
+        Connection con;
+        PreparedStatement pstmt;
+        try {
+            con = ds.getConnection(username, password);
+            con.setAutoCommit(false);
+            pstmt = con.prepareStatement("UPDATE COFFEES " +
+                        "SET PRICE = ? " +
+                        "WHERE COF_NAME = ?");
+            pstmt.setFloat(1, price);
+            pstmt.setString(2, cofName);
+            pstmt.executeUpdate();
+            con.commit();
+            pstmt.close();
+        } finally {
+            if (con != null) con.close();
+        }
+    }
+    private DataSource ds = null;
+    private Context ctx = null;
+}
+    </pre>
+    <p>
+        Соединение в этом примере кода участвует в пуле соединений, потому что верно следующее:
+    </p>
+    <ul>
+        <li>
+            Развернут экземпляр класса, реализующего <code>ConnectionPoolDataSource</code>.
+        </li>
+        <li>
+            Развернут экземпляр класса, реализующего <code>DataSource</code>, а значение, установленное
+            для его свойства <code>dataSourceName</code>, является логическим именем, которое было привязано
+            к ранее развернутому <code>ConnectionPoolDataSource</code>.
+        </li>
+    </ul>
+    <p>
+        Обратите внимание: хотя этот код очень похож на код, который вы видели ранее,
+        он отличается следующим образом:
+    </p>
+    <ul>
+        <li>
+            <p>
+                Он импортирует пакеты <code>javax.sql</code>, <code>javax.ejb </code> и <code>javax.naming</code>
+                в дополнение к <code>java.sql</code>
+            </p>
+            <p>
+                Интерфейсы <code>DataSource</code> и <code>ConnectionPoolDataSource</code> находятся в пакете
+                <code>javax.sql</code> и конструкторе JNDI <code>InitialContext</code> и методе
+                <code>Context.lookup()</code> являются частью пакета <code>javax.naming</code>.
+                Этот конкретный пример кода представлен в виде компонента EJB, который использует API из пакета
+                <code>javax.ejb</code>. Цель этого примера - показать, что вы используете объединенное соединение
+                так же, как вы используете несвязанное соединение, поэтому вам не нужно беспокоиться о понимании
+                EJB API.
+            </p>
+        </li>
+        <li>
+            <p>
+                Он использует объект <code>DataSource</code>, чтобы получить соединение вместо использования
+                средства <code>DriverManager</code>.
+            </p>
+        </li>
+        <li>
+            <p>
+                Он использует блок <code>finally</code>, чтобы убедиться, что соединение закрыто.
+            </p>
+        </li>
+    </ul>
+    <p>
+        Получение и использование объединенного соединения похоже на получение и использование обычного соединения.
+        Когда кто-то, действуя как системный администратор, правильно развернул объект
+        <code>ConnectionPoolDataSource</code> и объект DataSource, приложение использует этот объект
+        <code>DataSource</code> для получения объединенного соединения. Однако приложение должно использовать блок
+        <code>finally</code> для закрытия объединенного соединения. Для простоты в предыдущем примере использовался
+        блок <code>finally</code>, но не блок <code>catch</code>. Если исключение выбрано методом в блоке
+        <code>try</code>, оно будет выбрано по умолчанию, и предложение <code>finally</code> будет выполнено
+        в любом случае.
+    </p>
+    <h2 id="deployment_distributed_transactions">Развертывание распределенных транзакций</h2>
+    <p>
+        Объекты <code>DataSource</code> могут быть развернуты для получения соединений, которые могут
+        использоваться в распределенных транзакциях. Как и при объединении пулов, необходимо развернуть
+        два разных экземпляра класса: объект <code>XADataSource</code> и объект <code>DataSource</code>,
+        который используется для работы с ним.
+    </p>
+    <p>
+        Предположим, что EJB-сервер, купленный покупателем The Coffee Break, включает в себя класс
+        <code>DataSource</code> из пакета <code>com.applogic.TransactionalDS</code>, который работает
+        с классом <code>XADataSource</code>, таким как <code>com.dbaccess.XATransactionalDS</code>.
+        Тот факт, что он работает с любым классом <code>XADataSource</code>, делает EJB-сервер переносимым
+        драйверами JDBC. Когда объекты DataSource и <code>XADataSource</code> развернуты, созданные соединения
+        смогут участвовать в распределенных транзакциях. В этом случае класс
+        <code>com.applogic.TransactionalDS</code> реализован так, чтобы создаваемые соединения также объединялись
+        в соединения, что обычно будет иметь место для классов <code>DataSource</code>, предоставляемых как часть
+        реализации EJB-сервера.
+    </p>
+    <p>
+        Сначала должен быть развернут объект <code>XADataSource</code>. Следующий код создает экземпляр
+        <code>com.dbaccess.XATransactionalDS</code> и устанавливает его свойства:
+    </p>
+    <pre>
+com.dbaccess.XATransactionalDS xads = new com.dbaccess.XATransactionalDS();
+xads.setServerName("creamer");
+xads.setDatabaseName("COFFEEBREAK");
+xads.setPortNumber(9040);
+xads.setDescription("Distributed transactions for COFFEEBREAK DBMS");
+    </pre>
+    <p>
+        Следующий код регистрирует <code>xads</code> типа <code>com.dbaccess.XATransactionalDS</code>
+        с помощью службы именования JNDI. Обратите внимание, что логическое имя, связанное с
+        <code><em>xads</em></code>, имеет подконтекст <code>xa</code>, добавленный в <code>jdbc</code>.
+        Oracle рекомендует, чтобы логическое имя любого экземпляра класса
+        <code>com.dbaccess.XATransactionalDS</code> всегда начиналось с <code>jdbc/xa</code>.
+    </p>
+    <pre>
+Context ctx = new InitialContext();
+ctx.bind("jdbc/xa/distCoffeeDB", xads);
+    </pre>
+    <p>
+        Затем развертывается объект <code>DataSource</code>, который реализуется для взаимодействия
+        с <code>xads</code> и другими объектами <code>XADataSource</code>. Обратите внимание, что класс
+        <code>DataSource</code> из пакета <code>com.dbaccess.XATransactionalDS</code>, может работать с классом
+        <code>XADataSource</code> от любого поставщика драйверов JDBC. Развертывание объекта
+        <code>DataSource</code> включает в себя создание экземпляра класса
+        <code>com.dbaccess.XATransactionalDS</code> и настройку его свойств. Свойству <code>DataSource</code>
+        присваивается значение <code>jdbc/xa/distCoffeeDB</code>, логическое имя, связанное с
+        <code>com.dbaccess.XATransactionalDS</code>. Это класс <code>XADataSource</code>, который реализует
+        возможности распределенных транзакций для класса <code>DataSource</code>. Следующий код развертывает
+        экземпляр класса <code>DataSource</code>:
+    </p>
+    <pre>
+com.applogic.TransactionalDS ds = new com.applogic.TransactionalDS();
+ds.setDescription("Produces distributed transaction " +
+                  "connections to COFFEEBREAK");
+ds.setDataSourceName("jdbc/xa/distCoffeeDB");
+Context ctx = new InitialContext();
+ctx.bind("jdbc/distCoffeeDB", ds);
+    </pre>
+    <p>
+        Теперь, когда развертываются экземпляры классов <code>com.applogic.TransactionalDS</code> и
+        <code>com.dbaccess.XATransactionalDS</code>, приложение может вызвать метод <code>getConnection()</code>
+        для экземпляров класса <code>TransactionalDS</code> для подключения к базе данных <code>COFFEEBREAK</code>,
+        которая может использоваться в распределенных транзакциях.
+    </p>
+    <h2 id="using_connections_distributed_transactions">Using Connections for Distributed Transactions</h2>
+    <p>
+        Чтобы получить соединение, которое может использоваться для распределенных транзакций, необходимо
+        использовать объект <code>DataSource</code>, который был правильно реализован и развернут, как показано
+        в разделе <a href="#deployment_distributed_transactions">Развертывание распределенных транзакций</a>.
+        С таким объектом DataSource вызовите метод getConnection на нем. После того, как у вас есть соединение,
+        используйте его так же, как и любое другое соединение. Поскольку <code>jdbc/distCoffeesDB</code> связан
+        с объектом <code>XADataSource</code> в службе именования JNDI, следующий код создает объект
+        <code>Connection</code>, который может использоваться в распределенных транзакциях:
+    </p>
+    <pre>
+Context ctx = new InitialContext();
+DataSource ds = (DataSource)ctx.lookup("jdbc/distCoffeesDB");
+Connection con = ds.getConnection();
+    </pre>
+    <p>
+        Существуют некоторые незначительные, но важные ограничения на то, как это соединение используется,
+        когда оно является частью распределенной транзакции. Менеджер транзакций контролирует, когда начинается
+        распределенная транзакция и когда она совершена или откат; поэтому код приложения никогда не должен
+        вызывать методы <code>Connection.commit()</code> или <code>Connection.rollback()</code>.
+        Приложение также не должно ссылаться на <code>Connection.setAutoCommit(true)</code>, что позволяет
+        использовать режим автоматической фиксации, поскольку это также будет мешать управлению транзакционным
+        менеджером границ транзакций. Это объясняет, почему новое соединение, созданное в рамках распределенной
+        транзакции, отключено по умолчанию для режима автоматической фиксации. Обратите внимание,
+        что эти ограничения применяются только тогда, когда соединение участвует в распределенной транзакции;
+        нет никаких ограничений, пока соединение не является частью распределенной транзакции.
+    </p>
+    <p>
+        В следующем примере предположим, что был отправлен заказ кофе, который запускает обновления для двух
+        таблиц, которые находятся на разных серверах СУБД. Первая таблица представляет собой новую таблицу
+        <code>INVENTORY</code>, а вторая - таблицу <code>COFFEES</code>. Поскольку эти таблицы находятся на разных
+        серверах СУБД, транзакция, включающая их оба, будет распределенной транзакцией. Код в следующем примере,
+        который получает соединение, обновляет таблицу <code>COFFEES</code> и закрывает соединение, является
+        второй частью распределенной транзакции.
+    </p>
+    <p>
+        Обратите внимание, что код явно не фиксирует или откатывает обновления, поскольку область распределенной
+        транзакции контролируется базовой системной инфраструктурой среднего уровня. Кроме того, предполагая,
+        что соединение, используемое для распределенной транзакции, представляет собой объединенное соединение,
+        приложение использует блок <code>finally</code> для закрытия соединения. Это гарантирует,
+        что действительное соединение будет закрыто, даже если выбрано исключение, тем самым гарантируя,
+        что соединение будет возвращено в пул соединений, подлежащих переработке.
+    </p>
+    <p>
+        Следующий пример кода иллюстрирует бизнес-компонент, который является классом, который реализует методы,
+        которые могут быть вызваны клиентским компьютером. Цель этого примера - продемонстрировать,
+        что код приложения для распределенной транзакции ничем не отличается от другого кода, за исключением того,
+        что он не вызывает методы <code>commit()</code>, <code>rollback()</code> и <code>setAutoCommit(true)</code>
+        интерфейса<code>Connection</code>. Поэтому вам не нужно беспокоиться о понимании используемого API EJB.
+    </p>
+    <pre>
+import java.sql.*;
+import javax.sql.*;
+import javax.ejb.*;
+import javax.naming.*;
+public class DistributedTransactionBean implements SessionBean {
+    // ...
+    public void ejbCreate() throws CreateException {
+        ctx = new InitialContext();
+        ds = (DataSource)ctx.lookup("jdbc/distCoffeesDB");
+    }
+    public void updateTotal(int incr, String cofName, String username,
+                            String password)
+        throws SQLException {
+        Connection con;
+        PreparedStatement pstmt;
+        try {
+            con = ds.getConnection(username, password);
+            pstmt = con.prepareStatement("UPDATE COFFEES " +
+                        "SET TOTAL = TOTAL + ? " +
+                        "WHERE COF_NAME = ?");
+            pstmt.setInt(1, incr);
+            pstmt.setString(2, cofName);
+            pstmt.executeUpdate();
+            stmt.close();
+        } finally {
+            if (con != null) con.close();
+        }
+    }
+    private DataSource ds = null;
+    private Context ctx = null;
+}
+</pre>
+</body>
+</html>
