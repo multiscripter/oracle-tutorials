@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Установка соединения</title>
+</head>
+<body>
+    <h1>Установка соединения</h1>
+    <p>
+        Во-первых, вам необходимо установить соединение с источником данных, который вы хотите использовать.
+        Источником данных может быть СУБД, файловая система или какой-либо другой источник данных
+        с соответствующим драйвером JDBC. Как правило, приложение JDBC подключается к целевому источнику данных
+        использованием одного из двух классов:
+    </p>
+    <ul>
+        <li>
+            <p>
+                <code>DriverManager</code>: Этот полностью реализованный класс подключает приложение
+                к источнику данных, который указан URL-адресом базы данных. Когда этот класс сначала пытается
+                установить соединение, он автоматически загружает все драйверы JDBC 4.0,
+                найденные в пути к классу. Обратите внимание, что ваше приложение должно вручную загружать
+                драйверы JDBC до версии 4.0.
+            </p>
+        </li>
+        <li>
+            <p>
+                <code>DataSource</code>: Этот интерфейс предпочтительнее <code>DriverManager</code>
+                поскольку он позволяет получить информацию о том, что базовый источник данных будет
+                прозрачным для вашего приложения. Свойства объекта <code>DataSource</code> устанавливаются так,
+                чтобы он представлял конкретный источник данных. См.
+                <a href="sqldatasources.html">Подключение к объектам DataSource</a>
+                для получения дополнительной информации. Для получения дополнительной информации
+                о разработке приложений с классом <code>DataSource</code> смотрите последний
+                <em><a href="http://docs.oracle.com/javaee/6/tutorial/doc/">Учебник The Java EE</a></em>.
+            </p>
+        </li>
+    </ul>
+    <p>
+        <strong>Примечание</strong>: Примеры в этом учебнике используют класс <code>DriverManager</code>
+        вместо класса <code>DataSource</code>, потому что он проще в использовании, и примеры не требуют
+        функций класса <code>DataSource</code>.
+    </p>
+    <p>Эта страница охватывает следующие темы:</p>
+    <ul>
+        <li><a href="#drivermanager">Использование класса DriverManager</a></li>
+        <li><a href="#db_connection_url">Указание URL-адресов подключения к базе данных</a></li>
+    </ul>
+    <h2 id="drivermanager">Использование класса DriverManager</h2>
+    <p>
+        Подключение к вашей СУБД с классом <code>DriverManager</code> включает вызов метода
+        <code>DriverManager.getConnection()</code>. Следующий метод
+        <a href="gettingstarted.html">getConnection()</a>
+        устанавливает соединение с базой данных:
+    </p>
+    <pre>
+    public Connection getConnection() throws SQLException {
+        Connection conn = null;
+        Properties connectionProps = new Properties();
+        connectionProps.put("user", this.userName);
+        connectionProps.put("password", this.password);
+        if (this.dbms.equals("mysql")) {
+            conn = DriverManager.getConnection(
+                       "jdbc:" + this.dbms + "://" +
+                       this.serverName +
+                       ":" + this.portNumber + "/",
+                       connectionProps);
+        } else if (this.dbms.equals("derby")) {
+            conn = DriverManager.getConnection(
+                       "jdbc:" + this.dbms + ":" +
+                       this.dbName +
+                       ";create=true",
+                       connectionProps);
+        }
+        System.out.println("Connected to database");
+        return conn;
+    }
+    </pre>
+    <p>
+        Метод <code>DriverManager.getConnection()</code> устанавливает соединение с базой данных.
+        Для этого метода требуется URL-адрес базы данных, который зависит от вашей СУБД.
+        Ниже приведены некоторые примеры URL-адресов баз данных:
+    </p>
+    <ol>
+        <li>
+            <p>
+                MySQL: <code>jdbc:mysql://localhost:3306/</code>, где <code>localhost</code>
+                это имя сервера базы данных, а <code>3306</code> это номер порта.
+            </p>
+        </li>
+        <li>
+            <p>
+                Java DB: <code>jdbc:derby:<em>testdb</em>;create=true</code>,
+                где <code><em>testdb</em></code> это имя базы данных,
+                а <code>create=true</code> инструктирует СУБД создать базу данных.
+            </p>
+            <p>
+                <strong>Примечание</strong>: Этот URL-адрес устанавливает соединение с базой данных
+                с Java DB Embedded Driver. Java DB также включает в себя драйвер сетевого клиента
+                (Network Client Driver), который использует другой URL-адрес.
+            </p>
+        </li>
+    </ol>
+    <p>
+        Этот метод определяет имя пользователя и пароль, необходимые для доступа к СУБД с объектом
+        <code>Properties</code>.
+    </p>
+    <p>
+        <strong>Примечание</strong>:
+    </p>
+    <ul>
+        <li>
+            <p>
+                Как правило, в URL-адресе базы данных вы также указываете имя существующей базы данных,
+                к которой хотите подключиться. Например URL <code>jdbc:mysql://localhost:3306/mysql</code>
+                представляет собой URL-адрес базы данных с именем <code>mysql</code> для СУБД MySQL.
+                В образцах этого руководства используется URL-адрес, который не указывает конкретную базу данных,
+                потому что образцы создают новую базу данных.
+            </p>
+        </li>
+        <li>
+            <p>
+                В предыдущих версиях JDBC для получения соединения вам сначала приходилось инициализировать
+                драйвер JDBC вызвом метода <code>Class.forName()</code>.
+                Этому методу требовался объект типа <code>java.sql.Driver</code>.
+                Каждый драйвер JDBC содержит один или несколько классов, реализующих интерфейс
+                <code>java.sql.Driver</code>. Драйверы для Java DB это
+                <code>org.apache.derby.jdbc.EmbeddedDriver</code>
+                и <code>org.apache.derby.jdbc.ClientDriver</code>, и один для MySQL Connector/J -
+                это<code>com.mysql.jdbc.Driver</code>. См. документацию вашего драйвера СУБД для получения
+                имени класса, реализующего интерфейс <code>java.sql.Driver</code>.
+            </p>
+            <p>
+                Любые драйверы JDBC 4.0, которые находятся в вашем пути к классу (class path),
+                автоматически загружаются.
+                (Однако вы должны вручную загрузить все драйверы до JDBC 4.0 с помощью вызова метода
+                <code>Class.forName()</code>.)
+            </p>
+        </li>
+    </ul>
+    <p>
+        Метод возвращает объект <code>Connection</code>, который представляет собой соединение с СУБД
+        или конкретной базой данных. Посылайте SQL-запросы к базе данных через этот объект.
+    </p>
+    <h2 id="db_connection_url">Указание URL-адресов подключения к базе данных</h2>
+    <p>
+        URL-адрес подключения к базе данных - это строка, которую использует ваш JDBC-драйвер СУБД
+        для подключения к базе данных. Он может содержать информацию, например, где искать базу данных,
+        имя базы данных для подключения и свойства конфигурации. Точный синтаксис URL-адреса подключения
+        к базе данных задается вашей СУБД.
+    </p>
+    <h3>URL-адреса подключения базы данных Java DB</h3>
+    <p>Ниже приведен синтаксис URL-адреса подключения к базе данных для Java DB:</p>
+    <pre>
+    jdbc:derby:[<em>subsubprotocol</em>:][<em>databaseName</em>]
+        [;<em>attribute</em>=<em>value</em>]*
+    </pre>
+    <ul>
+        <li>
+            <code><em>subsubprotocol</em></code> указывает, где Java DB должна искать базу данных: либо
+            в каталоге, либо в памяти, либо в пути класса (classpath), либо в файле JAR. Он обычно опускается.
+        </li>
+        <li>
+            <code><em>databaseName</em></code> это имя базы данных для подключения.
+        </li>
+        <li>
+            <code><em>attribute</em>=<em>value</em></code> представляет собой необязательный список атрибутов,
+            разделенных точкой с запятой. Эти атрибуты позволяют вам уведомить Java DB выполнять различные задачи,
+            в том числе следующие:
+            <ul>
+                <li>Создать базу данных, указанную в URL-адресе подключения.</li>
+                <li>Шифровать базу данных, указанную в URL-адресе подключения.</li>
+                <li>Указать каталоги для хранения информации о протоколировании и трассировке.</li>
+                <li>Указать имя пользователя и пароль для подключения к базе данных.</li>
+            </ul>
+        </li>
+    </ul>
+    <p>
+        См. <em>Java DB Developer's Guide</em> и <em>Java DB Reference Manual</em> из
+        <a href="http://docs.oracle.com/javadb/index_jdk8.html">Java DB Technical Documentation</a>
+        для получения большей информации.
+    </p>
+    <h3>MySQL Connector/J Database URL</h3>
+    <p>Ниже приведен синтаксис URL-адреса подключения к базе данных для MySQL Connector/J:</p>
+    <pre>
+    jdbc:mysql://[<em>host</em>][,<em>failoverhost</em>...]
+    [:<em>port</em>]/[<em>database</em>]
+    [?<em>propertyName1</em>][=<em>propertyValue1</em>]
+    [&amp;<em>propertyName2</em>][=<em>propertyValue2</em>]...
+    </pre>
+    <ul>
+        <li>
+            <code><em>host</em>:<em>port</em></code> имя хоста и номер порта компьютера,
+            на котором размещена ваша база данных. Если не указано, значения по умолчанию
+            <code><em>host</em></code> и <code><em>port</em></code> - это 127.0.0.1 и 3306 соответственно.
+        </li>
+        <li>
+            <code><em>database</em></code> это имя базы данных для подключения.
+            Если не указано, соединение выполняется без базы данных по умолчанию.
+        </li>
+        <li>
+            <code><em>failover</em></code> это имя резервной базы данных
+            (MySQL Connector/J поддерживает failover (переход на другой ресурс)).
+        </li>
+        <li>
+            <code><em>propertyName</em>=<em>propertyValue</em></code> представляет собой необязательный
+            список свойств, разделенных амперсандами. Эти атрибуты позволяют вам указывать
+            MySQL Connector/J для выполнения различных задач.
+        </li>
+    </ul>
+    <p>
+        См. <a href="http://dev.mysql.com/doc/"><em>MySQL Reference Manual (Справочное руководство по MySQL)</em></a>
+        для получения большей информации.
+    </p>
+</body>
+</html>

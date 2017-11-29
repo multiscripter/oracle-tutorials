@@ -17,3 +17,5 @@ target/
 *.iml
 *.db
 *.log
+
+JDBC/03_connecting/testdb

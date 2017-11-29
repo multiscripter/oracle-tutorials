@@ -18,5 +18,6 @@
     <modules>
         <module>01_gettingstarted</module>
         <module>02_processingsqlstatements</module>
+        <module>03_connecting</module>
     </modules>
 </project>
