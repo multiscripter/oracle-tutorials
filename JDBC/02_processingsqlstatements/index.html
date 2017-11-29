@@ -1,0 +1,220 @@
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>Processing SQL Statements with JDBC</title>
+</head>
+<body>
+    <h1>Обработка SQL-инструкций с помощью JDBC</h1>
+    <p>В общем случае для обработки любой инструкции SQL с помощью JDBC вы выполняете следующие действия:</p>
+    <ol>
+        <li><a href="#establishing_connections">Установить соединение.</a></li>
+        <li><a href="#creating_statements">Создать инструкцию.</a></li>
+        <li><a href="#executing_queries">Выполнить запрос.</a></li>
+        <li><a href="#processing_resultset_objects">Обработать объект <code>ResultSet</code>.</a></li>
+        <li><a href="#closing_connections">Закрыть соединение.</a></li>
+    </ol>
+    <p>
+        Эта страница использует следующий метод,
+        <code><a href="gettingstarted.html">CoffeesTables.viewTable()</a></code>,
+        из примера учебника, чтобы продемонстрировать эти шаги.
+        Этот метод выводит содержимое таблицы <code>COFFEES</code>.
+        Этот метод будет более подробно рассмотрен ниже в этом уроке:
+    </p>
+    <pre>
+    public static void viewTable(Connection con, String dbName)
+        throws SQLException {
+        Statement stmt = null;
+        String query = "select COF_NAME, SUP_ID, PRICE, " +
+                       "SALES, TOTAL " +
+                       "from " + dbName + ".COFFEES";
+        try {
+            stmt = con.createStatement();
+            ResultSet rs = stmt.executeQuery(query);
+            while (rs.next()) {
+                String coffeeName = rs.getString("COF_NAME");
+                int supplierID = rs.getInt("SUP_ID");
+                float price = rs.getFloat("PRICE");
+                int sales = rs.getInt("SALES");
+                int total = rs.getInt("TOTAL");
+                System.out.println(coffeeName + "\t" + supplierID +
+                                   "\t" + price + "\t" + sales +
+                                   "\t" + total);
+            }
+        } catch (SQLException e ) {
+            JDBCTutorialUtilities.printSQLException(e);
+        } finally {
+            if (stmt != null) { stmt.close(); }
+        }
+    }
+    </pre>
+    <h2 id="establishing_connections">Установка соединения</h2>
+    <p>
+        Сначала установите соединение с источником данных, который вы хотите использовать.
+        Источником данных может быть СУБД, файловая система или какой-либо другой
+        источник данных с соответствующим драйвером JDBC.
+        Это соединение представлено объектом <code>Connection</code>.
+        Дополнительную информацию см. в разделе
+        <a class="TutorialLink" target="_top" href="connecting.html">Установка соединения</a>.
+    </p>
+    <h2 id="creating_statements">Создание инструкции</h2>
+    <p>
+        <code>Statement</code> это интерфейс, представляющий SQL-инструкцию.
+        Вы выполняете <code>Statement</code>-объекты, и они генерируют <code>ResultSet</code>-объекты,
+        которые представляет собой таблицу данных, представляющую набор результатов базы данных.
+        Вам нужен объект <code>Connection</code>, чтобы создать объект <code>Statement</code>.
+    </p>
+    <p>
+        Например <code>CoffeesTables.viewTable()</code> создаёт <code>Statement</code>-объект со следующим кодом:
+    </p>
+    <pre>
+        stmt = con.createStatement();
+    </pre>
+    <p>Существует три различных типа Statement:</p>
+    <ul>
+        <li><code>Statement</code>: Используется для реализации простых операторов SQL без параметров.</li>
+        <li>
+            <code>PreparedStatement</code>: (расширяет <code>Statement</code>.)
+            Используется для предварительной компиляции операторов SQL,
+            которые могут содержать входные параметры. См. дополнительную информацию
+            <a class="TutorialLink" target="_top" href="prepared.html">Использование подготовленных SQL-инструкций</a>.
+        </li>
+        <li>
+            <code>CallableStatement:</code> (расширяет <code>PreparedStatement</code>.)
+            Используется для выполнения хранимых процедур, которые могут содержать как входные,
+            так и выходные параметры. См. дополнительную информацию
+            <a class="TutorialLink" target="_top" href="storedprocedures.html">Хранимые процедуры</a>.
+        </li>
+    </ul>
+    <h2 id="executing_queries">Выполнение запроса</h2>
+    <p>Чтобы выполнить запрос вызовите метод <code>execute</code> из <code>Statement</code> как указано далее:</p>
+    <ul>
+        <li>
+            <code>execute</code>: Возвращает <code>true</code> если первым объектом, возвращаемым запросом,
+            является объект <code>ResultSet</code>. Используйте этот метод, если запрос может вернуть один
+            или несколько объектов <code>ResultSet</code>. Извлеките объекты <code>ResultSet</code>
+            возвращенные из запроса, повторно вызывая метод <code>Statement.getResultSet()</code>.
+        </li>
+        <li><code>executeQuery</code>: Возвращает <code>ResultSet</code> объект.</li>
+        <li>
+            <code>executeUpdate</code>: Возвращает целое число, представляющее количество строк,
+            затронутых оператором SQL. Используйте этот метод, если вы используете SQL-операторы
+            <code>INSERT</code>, <code>DELETE</code>, или <code>UPDATE</code>.
+        </li>
+    </ul>
+    <p>
+        Например <code>CoffeesTables.viewTable()</code> выполняет объект <code>Statement</code> со следующим кодом:
+    </p>
+    <pre>
+        ResultSet rs = stmt.executeQuery(query);
+    </pre>
+    <p>
+        См. <a class="TutorialLink" target="_top" href="retrieving.html">
+            Извлечение и изменение значений из ResultSet
+        </a> для получения дополнительной информации.
+    </p>
+    <h2 id="processing_resultset_objects">Обработка объектов ResultSet</h2>
+    <p>
+        Вы получаете доступ к данным в объекте <code>ResultSet</code> с помощью курсора.
+        Обратите внимание, что этот курсор не является курсором базы данных.
+        Этот курсор является указателем, указывающим на одну строку данных в объекте <code>ResultSet</code>.
+        Первоначально курсор располагается перед первой строкой. Вы вызываете различные методы,
+        определенные в объекте <code>ResultSet</code>, чтобы переместить курсор.
+    </p>
+    <p>
+        Например, <code>CoffeesTables.viewTable()</code> повторно вызывает метод <code>ResultSet.next()</code>,
+        чтобы переместить курсор вперед на одну строку. Каждый раз, когда он вызывает <code>next()</code>,
+        метод выводит данные в строку, в которой в данный момент находится курсор:
+    </p>
+    <pre>
+    try {
+        stmt = con.createStatement();
+        ResultSet rs = stmt.executeQuery(query);
+        while (rs.next()) {
+            String coffeeName = rs.getString("COF_NAME");
+            int supplierID = rs.getInt("SUP_ID");
+            float price = rs.getFloat("PRICE");
+            int sales = rs.getInt("SALES");
+            int total = rs.getInt("TOTAL");
+            System.out.println(coffeeName + "\t" + supplierID +
+                               "\t" + price + "\t" + sales +
+                               "\t" + total);
+        }
+    }
+    // ...
+    </pre>
+    <p>
+        См. <a class="TutorialLink" target="_top" href="retrieving.html">
+            Извлечение и изменение значений из ResultSet
+        </a> для получения дополнительной информации.
+    </p>
+    <h2 id="closing_connections">Закрытие соединения</h2>
+    <p>
+        Когда вы закончите использовать <code>Statement</code>, вызовите метод <code>Statement.close()</code>,
+        чтобы немедленно освободить ресурсы, которые он использует. Когда вы вызываете этот метод,
+        его объекты <code>ResultSet</code> закрываются.
+    </p>
+    <p>
+        Например, метод <code>CoffeesTables.viewTable()</code> гарантирует,
+        что объект <code>Statement</code> закрыт в конце метода, независимо от любых объектов
+        <code>SQLException</code>, которые были сброшены, путем их упаковки в блок <code>finally</code>:
+    </p>
+    <pre>
+    } finally {
+        if (stmt != null) { stmt.close(); }
+    }
+    </pre>
+    <p>
+        JDBC генерирует <code>SQLException</code>, когда он сталкивается с ошибкой во время взаимодействия
+        с источником данных. Дополнительную информацию см. в разделе
+        <a class="TutorialLink" target="_top" href="sqlexception.html">Обработка исключений SQL</a>.
+    </p>
+    <p>
+        В JDBC 4.1, который доступен в версии Java SE 7 и более поздних версиях, вы можете использовать оператор
+        try-with-resources (try-с-ресурсами) для автоматического закрытия объектов <code>Connection, Statement</code>
+        и <code>ResultSet</code>, независимо от того, было ли выбрано <code>SQLException</code>.
+        Автоматический оператор ресурса состоит из инструкции <code>try</code> и одного или нескольких
+        объявленных ресурсов. Например, вы можете изменить <code>CoffeesTables.viewTable()</code>,
+        чтобы его объект <code>Statement</code> автоматически закрывался следующим образом:
+    </p>
+    <pre>
+    public static void viewTable(Connection con) throws SQLException {
+        String query = "select COF_NAME, SUP_ID, PRICE, " +
+                       "SALES, TOTAL " +
+                       "from COFFEES";
+    <strong>try (Statement stmt = con.createStatement())</strong> {
+            ResultSet rs = stmt.executeQuery(query);
+            while (rs.next()) {
+                String coffeeName = rs.getString("COF_NAME");
+                int supplierID = rs.getInt("SUP_ID");
+                float price = rs.getFloat("PRICE");
+                int sales = rs.getInt("SALES");
+                int total = rs.getInt("TOTAL");
+                System.out.println(coffeeName + ", " + supplierID +
+                                   ", " + price + ", " + sales +
+                                   ", " + total);
+            }
+        } catch (SQLException e) {
+            JDBCTutorialUtilities.printSQLException(e);
+        }
+    }
+    </pre>
+    <p>
+        Следующий оператор представляет собой оператор <code>try-with-resources</code>,
+        который объявляет один ресурс <code>stmt</code>, который будет автоматически закрыт при завершении блока
+        <code>try</code>:
+    </p>
+    <pre>
+    <strong>try (Statement stmt = con.createStatement())</strong> {
+        // ...
+    }
+    </pre>
+    <p>
+        См. <a class="TutorialLink" target="_top" href="../../essential/exceptions/tryResourceClose.html">
+            Оператор <code>try</code>-с-ресурсами
+        </a> в разделе <a class="TutorialLink" target="_top" href="../../essential/index.html">Основные классы</a>
+        для получения дополнительной информации.
+    </p>
+</body>
+</html>
