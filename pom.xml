@@ -63,6 +63,7 @@
                 <version>3.3</version>
                 <configuration>
                     <compilerVersion>1.8</compilerVersion>
+                    <compilerArgument>-Xlint</compilerArgument>
                 </configuration>
             </plugin>
         </plugins>
