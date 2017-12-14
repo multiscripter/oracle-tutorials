@@ -10,6 +10,7 @@
     <url>https://docs.oracle.com</url>
     
     <modules>
+        <module>EE</module>
         <module>JDBC</module>
     </modules>
 
