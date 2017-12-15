@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+
+<html lang="en" xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <meta charset="utf-8" />
+    <title>17.2 Жизненный цикл сервлета</title>
+</head>
+<body>
+    <h1>17.2 Жизненный цикл сервлета</h1>
+    <p>
+        Жизненный цикл сервлета контролируется контейнером, в&nbsp;котором был установлен сервлет.
+        Когда запрос сопоставляется сервлету, контейнер выполняет следующие шаги:
+    </p>
+    <ol>
+        <li>
+            <p>Если экземпляр сервлета не существует, веб-контейнер:</p>
+            <ol>
+                <li>
+                    <p>Загружает класс сервлета</p>
+                </li>
+                <li>
+                    <p>Создает экземпляр класса сервлета</p>
+                </li>
+                <li>
+                    <p>
+                        Инициализирует экземпляр сервлета, вызывая метод <code>init</code> (инициализация
+                        рассматривается в&nbsp;разделе <a href="#">&laquo;Создание и&nbsp;инициализация сервлета&raquo;</a>)
+                    </p>
+                </li>
+            </ol>
+        </li>
+        <li>
+            <p>
+                Контейнер вызывает метод службы, передавая объекты запроса и&nbsp;ответа.
+                Методы обслуживания обсуждаются в&nbsp;<a href="#">&laquo;Методах написания сервисов&raquo;</a>.
+            </p>
+        </li>
+    </ol>
+    <p>
+        Если ему нужно удалить сервлет, контейнер завершает сервлет, вызывая у сервлета метод <code>destroy</code>.
+        Дополнительные сведения&nbsp;см. в&nbsp;разделе <a href="#">&laquo;Завершение сервлета&raquo;.</a>
+    </p>
+    <h2>17.2.1 Обработка событий жизненного цикла сервлета</h2>
+    <p>
+        Вы&nbsp;можете отслеживать и&nbsp;реагировать на&nbsp;события в&nbsp;жизненном цикле сервлета,
+        определяя объекты-слушатели, методы которых вызываются при возникновении событий жизненного цикла.
+        Чтобы использовать эти объекты-слушатели, вы&nbsp;должны определить и&nbsp;указать класс слушателя.
+    </p>
+    <h3>17.2.1.1 Определение класса слушателя</h3>
+    <p>
+        Вы&nbsp;определяете класс слушателя как реализацию интерфейса слушателя.
+        В&nbsp;таблице 17-1 перечислены события, которые можно контролировать, и&nbsp;соответствующий интерфейс,
+        который должен быть реализован. Когда вызывается метод слушателя, ему передается событие,
+        содержащее информацию, соответствующую событию. Например, методам в&nbsp;интерфейсе
+        <code>HttpSessionListener</code> передается <code>HttpSessionEvent</code>,
+        который содержит <code>HttpSession</code>.
+    </p>
+    <p><i><b>Таблица 17-1 События жизненного цикла сервлета</b></i></p>
+    <table title="События жизненного цикла сервлета" summary="В этой таблице перечислены события жизненного цикла сервлета, связанные с веб-контекстом, сеансом и объектами запроса, а также связанный с ним интерфейс слушателя и класс событий для каждого события.">
+        <thead>
+            <tr>
+                <th>Объект</th>
+                <th>Событие</th>
+                <th>Интерфейс слушателя и класс события</th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td>
+                    <p>Веб-контекст</p>
+                </td>
+                <td>
+                    <p>Инициализация и уничтожение</p>
+                </td>
+                <td>
+                    <p>
+                        <code>javax.servlet.ServletContextListener</code>
+                        и&nbsp;<code>ServletContextEvent</code>
+                    </p>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <p>Веб-контекст</p>
+                </td>
+                <td>
+                    <p>Атрибут добавлен, удалён или&nbsp;заменён</p>
+                </td>
+                <td>
+                    <p>
+                        <code>javax.servlet.ServletContextAttributeListener</code>
+                        и&nbsp;<code>ServletContextAttributeEvent</code>
+                    </p>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <p>Сессия</p>
+                </td>
+                <td>
+                    <p>Создание, аннулирование, активация, пассивация и таймаут</p>
+                </td>
+                <td>
+                    <p>
+                        <code>javax.servlet.http.HttpSessionListener</code>,
+                        <code>javax.servlet.http.HttpSessionActivationListener</code>,
+                        и&nbsp;<code>HttpSessionEvent</code>
+                    </p>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <p>Сессия</p>
+                </td>
+                <td>
+                    <p>Атрибут добавлен, удалён или&nbsp;заменён</p>
+                </td>
+                <td>
+                    <p>
+                        <code>javax.servlet.http.HttpSessionAttributeListener</code>
+                        и&nbsp;<code>HttpSessionBindingEvent</code>
+                    </p>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <p>Запрос</p>
+                </td>
+                <td>
+                    <p>Запрос сервлета начал обрабатываться веб-компонентами</p>
+                </td>
+                <td>
+                    <p>
+                        <code>javax.servlet.ServletRequestListener</code>
+                        и&nbsp;<code>ServletRequestEvent</code>
+                    </p>
+                </td>
+            </tr>
+            <tr>
+                <td>
+                    <p>Запрос</p>
+                </td>
+                <td>
+                    <p>Атрибут добавлен, удалён или&nbsp;заменён</p>
+                </td>
+                <td>
+                    <p>
+                        <code>javax.servlet.ServletRequestAttributeListener</code>
+                        и&nbsp;<code>ServletRequestAttributeEvent</code>
+                    </p>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+    <p>
+        Используйте аннотацию <code>@WebListener</code>, чтобы определить слушателя для&nbsp;получения событий
+        для&nbsp;различных операций в&nbsp;конкретном контексте веб-приложения. Классы, аннотированные
+        с&nbsp;помощью <code>@WebListener</code>, должны реализовывать один из&nbsp;следующих интерфейсов:
+    </p>
+    <pre>
+javax.servlet.ServletContextListener
+javax.servlet.ServletContextAttributeListener
+javax.servlet.ServletRequestListener
+javax.servlet.ServletRequestAttributeListener
+javax.servlet.http.HttpSessionListener
+javax.servlet.http.HttpSessionAttributeListener
+    </pre>
+    <p>
+        Например, следующий фрагмент кода определяет слушателя, который реализует два из&nbsp;этих интерфейсов:
+    </p>
+    <pre>
+import javax.servlet.ServletContextAttributeListener;
+import javax.servlet.ServletContextListener;
+import javax.servlet.annotation.WebListener;
+@WebListener()
+public class SimpleServletListener implements ServletContextListener,
+        ServletContextAttributeListener {
+    ...
+    </pre>
+    <h2>17.2.2 Обработка ошибок сервлета</h2>
+    <p>
+        Любое количество исключений может возникать при выполнении сервлета. Когда возникает исключение,
+        веб-контейнер создает страницу по&nbsp;умолчанию, содержащую следующее сообщение:
+    </p>
+    <pre>
+A Servlet Exception Has Occurred
+    </pre>
+    <p>
+        Но вы также можете указать, что контейнер должен возвращать определенную страницу ошибки
+        для&nbsp;данного исключения.
+    </p>
+</body>
+</html>
